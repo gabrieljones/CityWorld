@@ -81,7 +81,7 @@ public class RoadLot extends ConnectedLot {
 				Material.QUARTZ_BLOCK);
 		// paved sidewalk is 2, read in PlatLot
 		dirtroadMat = platmap.generator.materialProvider.itemsMaterialListFor_Roads.getNthMaterial(3,
-				Material.GRASS_PATH);
+				Material.DIRT_PATH);
 		// dirt sidewalk is 4, read in PlatLot
 
 		pavementIsClay = pavementMat == Material.WHITE_TERRACOTTA;

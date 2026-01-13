@@ -106,7 +106,7 @@ public class ShapeProvider_SandDunes extends ShapeProvider_Normal {
 
 	@Override
 	protected Biome remapBiome(CityWorldGenerator generator, PlatLot lot, Biome biome) {
-		return Biome.DESERT_HILLS;
+		return Biome.DESERT;
 	}
 
 	@Override
