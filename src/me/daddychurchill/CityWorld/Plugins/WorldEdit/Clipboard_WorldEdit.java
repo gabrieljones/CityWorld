@@ -121,27 +121,27 @@ public class Clipboard_WorldEdit extends me.daddychurchill.CityWorld.Clipboard.C
              // Note: WorldEdit flipping might be different, but scaling is a general way to mirror.
              // However, scaling by -1 changes the winding order and coordinate system.
              // ClipboardHolder transform support should handle it.
-             AffineTransform transformX = new AffineTransform().scale(new BlockVector3(-1, 1, 1).toVector3());
+             AffineTransform transformX = new AffineTransform().scale(BlockVector3.at(-1, 1, 1).toVector3());
              ClipboardHolder h1 = new ClipboardHolder(clipboard);
              h1.setTransform(h1.getTransform().combine(transformX));
              holders[1] = h1;
 
              if (flipableZ) {
                  // 3: Flip X then Flip Z (Scale -1, 1, -1) -> this corresponds to index 3 in original logic
-                 AffineTransform transformXZ = new AffineTransform().scale(new BlockVector3(-1, 1, -1).toVector3());
+                 AffineTransform transformXZ = new AffineTransform().scale(BlockVector3.at(-1, 1, -1).toVector3());
                  ClipboardHolder h3 = new ClipboardHolder(clipboard);
                  h3.setTransform(h3.getTransform().combine(transformXZ));
                  holders[3] = h3;
 
                  // 2: Flip Z only? (Scale 1, 1, -1) -> this corresponds to index 2 in original logic
-                 AffineTransform transformZ = new AffineTransform().scale(new BlockVector3(1, 1, -1).toVector3());
+                 AffineTransform transformZ = new AffineTransform().scale(BlockVector3.at(1, 1, -1).toVector3());
                  ClipboardHolder h2 = new ClipboardHolder(clipboard);
                  h2.setTransform(h2.getTransform().combine(transformZ));
                  holders[2] = h2;
              }
         } else if (flipableZ) {
              // 1: Flip Z
-             AffineTransform transformZ = new AffineTransform().scale(new BlockVector3(1, 1, -1).toVector3());
+             AffineTransform transformZ = new AffineTransform().scale(BlockVector3.at(1, 1, -1).toVector3());
              ClipboardHolder h1 = new ClipboardHolder(clipboard);
              h1.setTransform(h1.getTransform().combine(transformZ));
              holders[1] = h1;
