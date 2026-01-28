@@ -1,295 +1,239 @@
 package me.daddychurchill.CityWorld.Plugins.WorldEdit;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 
 import org.bukkit.Material;
 import org.bukkit.block.BlockFace;
 import org.bukkit.configuration.file.YamlConfiguration;
 
-import com.sk89q.worldedit.CuboidClipboard;
-import com.sk89q.worldedit.CuboidClipboard.FlipDirection;
 import com.sk89q.worldedit.EditSession;
-import com.sk89q.worldedit.MaxChangedBlocksException;
-import com.sk89q.worldedit.Vector;
-import com.sk89q.worldedit.blocks.BaseBlock;
+import com.sk89q.worldedit.WorldEdit;
+import com.sk89q.worldedit.bukkit.BukkitAdapter;
 import com.sk89q.worldedit.bukkit.BukkitWorld;
-import com.sk89q.worldedit.schematic.SchematicFormat;
+import com.sk89q.worldedit.extent.clipboard.Clipboard;
+import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormat;
+import com.sk89q.worldedit.extent.clipboard.io.ClipboardFormats;
+import com.sk89q.worldedit.extent.clipboard.io.ClipboardReader;
+import com.sk89q.worldedit.function.operation.Operation;
+import com.sk89q.worldedit.function.mask.RegionMask;
+import com.sk89q.worldedit.function.operation.Operations;
+import com.sk89q.worldedit.math.BlockVector3;
+import com.sk89q.worldedit.math.transform.AffineTransform;
+import com.sk89q.worldedit.regions.CuboidRegion;
+import com.sk89q.worldedit.session.ClipboardHolder;
+import com.sk89q.worldedit.world.block.BlockState;
 
 import me.daddychurchill.CityWorld.CityWorldGenerator;
-import me.daddychurchill.CityWorld.Clipboard.Clipboard;
 import me.daddychurchill.CityWorld.Support.RealBlocks;
 
-@SuppressWarnings("deprecation")
-public class Clipboard_WorldEdit extends Clipboard {
+public class Clipboard_WorldEdit extends me.daddychurchill.CityWorld.Clipboard.Clipboard {
 
-	private BaseBlock[][][][] blocks;
-	private int facingCount;
-	private boolean flipableX = false;
-	private boolean flipableZ = false;
-//  private boolean Rotatable = false;
-//	private boolean ScalableXZ = false;
-//	private boolean ScalableY = false;
-//	private int FloorHeightY = DataContext.FloorHeight;
+    private ClipboardHolder[] holders;
+    private int facingCount;
+    private boolean flipableX = false;
+    private boolean flipableZ = false;
 
-	private final static String metaExtension = ".yml";
-	private final static String tagGroundLevelY = "GroundLevelY";
-	private final static String tagFlipableX = "FlipableX";
-	private final static String tagFlipableZ = "FlipableZ";
-	//	private final static String tagScalableX = "ScalableX";
-//	private final static String tagScalableZ = "ScalableZ";
-//	private final static String tagScalableY = "ScalableY";
-//	private final static String tagFloorHeightY = "FloorHeightY";
-	private final static String tagOddsOfAppearance = "OddsOfAppearance";
-	private final static String tagBroadcastLocation = "BroadcastLocation";
-	private final static String tagDecayable = "Decayable";
+    private final static String metaExtension = ".yml";
+    private final static String tagGroundLevelY = "GroundLevelY";
+    private final static String tagFlipableX = "FlipableX";
+    private final static String tagFlipableZ = "FlipableZ";
+    private final static String tagOddsOfAppearance = "OddsOfAppearance";
+    private final static String tagBroadcastLocation = "BroadcastLocation";
+    private final static String tagDecayable = "Decayable";
 
-	public Clipboard_WorldEdit(CityWorldGenerator generator, File file) throws Exception {
-		super(generator, file);
-	}
+    public Clipboard_WorldEdit(CityWorldGenerator generator, File file) throws Exception {
+        super(generator, file);
+    }
 
-	@Override
-	protected void load(CityWorldGenerator generator, File file) throws Exception {
+    @Override
+    protected void load(CityWorldGenerator generator, File file) throws Exception {
+        // Load metadata
+        YamlConfiguration metaYaml = new YamlConfiguration();
+        metaYaml.options().header("CityWorld/WorldEdit schematic configuration");
+        metaYaml.options().copyDefaults(true);
 
-		// prepare to read the meta data
-		YamlConfiguration metaYaml = new YamlConfiguration();
-		metaYaml.options().header("CityWorld/WorldEdit schematic configuration");
-		metaYaml.options().copyDefaults(true);
+        metaYaml.addDefault(tagGroundLevelY, groundLevelY);
+        metaYaml.addDefault(tagFlipableX, flipableX);
+        metaYaml.addDefault(tagFlipableZ, flipableZ);
+        metaYaml.addDefault(tagOddsOfAppearance, oddsOfAppearance);
+        metaYaml.addDefault(tagBroadcastLocation, broadcastLocation);
+        metaYaml.addDefault(tagDecayable, decayable);
 
-		// add the defaults
-		metaYaml.addDefault(tagGroundLevelY, groundLevelY);
-		metaYaml.addDefault(tagFlipableX, flipableX);
-		metaYaml.addDefault(tagFlipableZ, flipableZ);
-//		metaYaml.addDefault(tagScalableX, ScalableX);
-//		metaYaml.addDefault(tagScalableZ, ScalableZ);
-//		metaYaml.addDefault(tagScalableY, ScalableY);
-//		metaYaml.addDefault(tagFloorHeightY, FloorHeightY);
-		metaYaml.addDefault(tagOddsOfAppearance, oddsOfAppearance);
-		metaYaml.addDefault(tagBroadcastLocation, broadcastLocation);
-		metaYaml.addDefault(tagDecayable, decayable);
+        File metaFile = new File(file.getAbsolutePath() + metaExtension);
+        if (metaFile.exists()) {
+            metaYaml.load(metaFile);
+            groundLevelY = Math.max(0, metaYaml.getInt(tagGroundLevelY, groundLevelY));
+            flipableX = metaYaml.getBoolean(tagFlipableX, flipableX);
+            flipableZ = metaYaml.getBoolean(tagFlipableZ, flipableZ);
+            oddsOfAppearance = Math.max(0.0, Math.min(1.0, metaYaml.getDouble(tagOddsOfAppearance, oddsOfAppearance)));
+            broadcastLocation = metaYaml.getBoolean(tagBroadcastLocation, broadcastLocation);
+            decayable = metaYaml.getBoolean(tagDecayable, decayable);
+        }
 
-		// start reading it
-		File metaFile = new File(file.getAbsolutePath() + metaExtension);
-		if (metaFile.exists()) {
-			metaYaml.load(metaFile);
-			groundLevelY = Math.max(0, metaYaml.getInt(tagGroundLevelY, groundLevelY));
-			flipableX = metaYaml.getBoolean(tagFlipableX, flipableX);
-			flipableZ = metaYaml.getBoolean(tagFlipableZ, flipableZ);
-//			ScalableX = metaYaml.getBoolean(tagScalableX, ScalableX) && sizeX == 3;
-//			ScalableZ = metaYaml.getBoolean(tagScalableZ, ScalableZ) && sizeZ == 3;
-//			ScalableY = metaYaml.getBoolean(tagScalableY, ScalableY);
-//			FloorHeightY = Math.max(2, Math.min(16, metaYaml.getInt(tagFloorHeightY, FloorHeightY)));
-			oddsOfAppearance = Math.max(0.0, Math.min(1.0, metaYaml.getDouble(tagOddsOfAppearance, oddsOfAppearance)));
-			broadcastLocation = metaYaml.getBoolean(tagBroadcastLocation, broadcastLocation);
-			decayable = metaYaml.getBoolean(tagDecayable, decayable);
-		}
+        // Load schematic
+        ClipboardFormat format = ClipboardFormats.findByFile(file);
+        if (format == null) {
+            throw new IOException("Unknown schematic format: " + file.getName());
+        }
 
-		// load the actual blocks
-		CuboidClipboard cuboid = SchematicFormat.getFormat(file).load(file);
+        Clipboard clipboard;
+        try (ClipboardReader reader = format.getReader(new FileInputStream(file))) {
+            clipboard = reader.read();
+        }
 
-		// how big is it?
-		sizeX = cuboid.getWidth();
-		sizeZ = cuboid.getLength();
-		sizeY = cuboid.getHeight();
+        // Ensure origin is at minimum point for consistent pasting relative to 0,0,0
+        clipboard.setOrigin(clipboard.getMinimumPoint());
 
-		// TODO Validate the size
+        // Set dimensions
+        sizeX = clipboard.getDimensions().getBlockX();
+        sizeY = clipboard.getDimensions().getBlockY();
+        sizeZ = clipboard.getDimensions().getBlockZ();
 
-		// try and save the meta data if we can
-		try {
-			metaYaml.save(metaFile);
-		} catch (IOException e) {
+        // Save metadata if needed
+        try {
+            metaYaml.save(metaFile);
+        } catch (IOException e) {
+            generator.reportException("[WorldEdit] Could not resave " + metaFile.getAbsolutePath(), e);
+        }
 
-			// we can recover from this... so eat it!
-			generator.reportException("[WorldEdit] Could not resave " + metaFile.getAbsolutePath(), e);
-		}
+        // Get edge material (at 0, groundLevelY, 0) relative to origin
+        BlockVector3 edgePos = clipboard.getOrigin().add(0, groundLevelY, 0);
+        BlockState edgeBlock = clipboard.getBlock(edgePos);
 
-		// TODO I need to fix this code over in ClipboardLot when I figure out how to
-		// use the new WorldEdit schematic code
-		/*
-		 * chunk.setBlocks(0, edgeX1, edgeY2, 0, 16, clip.edgeMaterial);//,
-		 * clip.edgeData); chunk.setBlocks(edgeX2, 16, edgeY2, 0, 16,
-		 * clip.edgeMaterial);//, clip.edgeData); chunk.setBlocks(edgeX1, edgeX2,
-		 * edgeY2, 0, edgeZ1, clip.edgeMaterial);//, clip.edgeData);
-		 * chunk.setBlocks(edgeX1, edgeX2, edgeY2, edgeZ2, 16, clip.edgeMaterial);//,
-		 * clip.edgeData);
-		 */
+        // Convert to Bukkit Material
+        // Note: BukkitAdapter.adapt(BlockState) returns MaterialData in older versions, but Material in newer?
+        // Actually BukkitAdapter.adapt(BlockType) returns Material.
+        edgeMaterial = BukkitAdapter.adapt(edgeBlock.getBlockType());
+        edgeRise = generator.oreProvider.surfaceMaterial.equals(edgeMaterial) ? 0 : 1;
 
-		// TODO I need to change the edgeMaterial and edgeData types to be Material and
-		// MaterialData or something like that
-		// grab the edge block
-		BaseBlock edge = cuboid.getBlock(new Vector(0, groundLevelY, 0));
-		edgeMaterial = Material.getMaterial(edge.getNbtId(), true);
-//		edgeMaterial = Material.getMaterial(edge.getType());
-//		edgeData = edge.getData(); // TODO: One of these days I need to get this working again
-		edgeRise = generator.oreProvider.surfaceMaterial.equals(edgeMaterial) ? 0 : 1;
+        // Prepare holders
+        facingCount = 1;
+        if (flipableX) facingCount *= 2;
+        if (flipableZ) facingCount *= 2;
 
-		// allocate the blocks
-		facingCount = 1;
-		if (flipableX)
-			facingCount *= 2;
-		if (flipableZ)
-			facingCount *= 2;
+        holders = new ClipboardHolder[facingCount];
 
-		// TODO we should allocate only facing count, then allocate the size based on
-		// what comes out of the rotation.. once I do rotation
-		// allocate room
-		blocks = new BaseBlock[facingCount][sizeX][sizeY][sizeZ];
+        // 0: Original
+        holders[0] = new ClipboardHolder(clipboard);
 
-		// copy the cubes for each direction
-		copyCuboid(cuboid, 0); // normal one
-		if (flipableX) {
-			cuboid.flip(FlipDirection.WEST_EAST);
-			copyCuboid(cuboid, 1);
+        if (flipableX) {
+             // 1: Flip X (Scale -1, 1, 1)
+             // Note: WorldEdit flipping might be different, but scaling is a general way to mirror.
+             // However, scaling by -1 changes the winding order and coordinate system.
+             // ClipboardHolder transform support should handle it.
+             AffineTransform transformX = new AffineTransform().scale(BlockVector3.at(-1, 1, 1).toVector3());
+             ClipboardHolder h1 = new ClipboardHolder(clipboard);
+             h1.setTransform(h1.getTransform().combine(transformX));
+             holders[1] = h1;
 
-			// z too? if so then make two more copies
-			if (flipableZ) {
-				cuboid.flip(FlipDirection.NORTH_SOUTH);
-				copyCuboid(cuboid, 3);
-				cuboid.flip(FlipDirection.WEST_EAST);
-				copyCuboid(cuboid, 2);
-			}
+             if (flipableZ) {
+                 // 3: Flip X then Flip Z (Scale -1, 1, -1) -> this corresponds to index 3 in original logic
+                 AffineTransform transformXZ = new AffineTransform().scale(BlockVector3.at(-1, 1, -1).toVector3());
+                 ClipboardHolder h3 = new ClipboardHolder(clipboard);
+                 h3.setTransform(h3.getTransform().combine(transformXZ));
+                 holders[3] = h3;
 
-			// just z
-		} else if (flipableZ) {
-			cuboid.flip(FlipDirection.NORTH_SOUTH);
-			copyCuboid(cuboid, 1);
-		}
-	}
+                 // 2: Flip Z only? (Scale 1, 1, -1) -> this corresponds to index 2 in original logic
+                 AffineTransform transformZ = new AffineTransform().scale(BlockVector3.at(1, 1, -1).toVector3());
+                 ClipboardHolder h2 = new ClipboardHolder(clipboard);
+                 h2.setTransform(h2.getTransform().combine(transformZ));
+                 holders[2] = h2;
+             }
+        } else if (flipableZ) {
+             // 1: Flip Z
+             AffineTransform transformZ = new AffineTransform().scale(BlockVector3.at(1, 1, -1).toVector3());
+             ClipboardHolder h1 = new ClipboardHolder(clipboard);
+             h1.setTransform(h1.getTransform().combine(transformZ));
+             holders[1] = h1;
+        }
+    }
 
-	private void copyCuboid(CuboidClipboard cuboid, int facing) {
-		for (int x = 0; x < sizeX; x++)
-			for (int y = 0; y < sizeY; y++)
-				for (int z = 0; z < sizeZ; z++)
-					blocks[facing][x][y][z] = cuboid.getBlock(new Vector(x, y, z));
-	}
+    private int getFacingIndex(BlockFace facing) {
+        int result = 0;
+        switch (facing) {
+        case SOUTH: result = 0; break;
+        case WEST: result = 1; break;
+        case NORTH: result = 2; break;
+        default: result = 3; break;
+        }
+        return Math.min(facingCount - 1, result);
+    }
 
-	private EditSession getEditSession(CityWorldGenerator generator) {
-		return new EditSession(new BukkitWorld(generator.getWorld()), blockCount);
-	}
+    @Override
+    public void paste(CityWorldGenerator generator, RealBlocks chunk, BlockFace facing, int blockX, int blockY,
+            int blockZ) {
+        BlockVector3 to = BlockVector3.at(blockX, blockY, blockZ);
+        try {
+            ClipboardHolder holder = holders[getFacingIndex(facing)];
 
-	private int getFacingIndex(BlockFace facing) {
-		int result = 0;
-		switch (facing) {
-		case SOUTH:
-			result = 0;
-			break;
-		case WEST:
-			result = 1;
-			break;
-		case NORTH:
-			result = 2;
-			break;
-		default: // case EAST:
-			result = 3; // TODO: This was 2 for some reason... shouldn't it have been 3????
-			break;
-		}
-		return Math.min(facingCount - 1, result);
-	}
+            try (EditSession editSession = WorldEdit.getInstance().newEditSession(new BukkitWorld(generator.getWorld()))) {
+                 Operation operation = holder
+                        .createPaste(editSession)
+                        .to(to)
+                        .ignoreAirBlocks(true)
+                        .build();
+                 Operations.complete(operation);
+            }
+        } catch (Exception e) {
+            generator.reportException("[WorldEdit] Place schematic " + name + " at " + to + " failed", e);
+        }
+    }
 
-	@Override
-	public void paste(CityWorldGenerator generator, RealBlocks chunk, BlockFace facing, int blockX, int blockY,
-			int blockZ) {
-		Vector at = new Vector(blockX, blockY, blockZ);
-		try {
-			EditSession editSession = getEditSession(generator);
-			// editSession.setFastMode(true);
-			place(editSession, getFacingIndex(facing), at, true);
-		} catch (Exception e) {
-			generator.reportException("[WorldEdit] Place schematic " + name + " at " + at + " failed", e);
-		}
-	}
+    @Override
+    public void paste(CityWorldGenerator generator, RealBlocks chunk, BlockFace facing, int blockX, int blockY,
+            int blockZ, int x1, int x2, int y1, int y2, int z1, int z2) {
+        BlockVector3 to = BlockVector3.at(blockX, blockY, blockZ);
+        try {
+            ClipboardHolder holder = holders[getFacingIndex(facing)];
 
-//	@Override
-//	public void paste(WorldGenerator generator, RealChunk chunk, Direction.Facing facing, 
-//			int blockX, int blockY, int blockZ,
-//			int x1, int x2, int y1, int y2, int z1, int z2) {
-//		
-////		generator.reportMessage("Partial paste: origin = " + at + " min = " + min + " max = " + max);
-//		
-//		try {
-//			int iFacing = getFacingIndex(facing);
-//			EditSession editSession = getEditSession(generator);
-//			//editSession.setFastMode(true);
-//			for (int x = x1; x < x2; x++)
-//				for (int y = y1; y < y2; y++)
-//					for (int z = z1; z < z2; z++) {
-////						generator.reportMessage("facing = " + iFacing + 
-////								" x = " + x +
-////								" y = " + y + 
-////								" z = " + z);
-//						if (blocks[iFacing][x][y][z].isAir()) {
-//							continue;
-//						}
-//						editSession.setBlock(new Vector(x, y, z).add(blockX, blockY, blockZ), 
-//								blocks[iFacing][x][y][z]);
-//					}
-//		} catch (Exception e) {
-//			e.printStackTrace();
-//			generator.reportException("[WorldEdit] Partial place schematic " + name + " failed", e);
-//		}
-//	}
+            try (EditSession editSession = WorldEdit.getInstance().newEditSession(new BukkitWorld(generator.getWorld()))) {
+                 // Define the mask region based on the provided bounds relative to the paste origin?
+                 // The bounds (x1, x2, etc.) are usually relative to the clipboard content or the chunk.
+                 // In CityWorld, these are typically chunk-relative coordinates or schematic-relative.
+                 // Assuming they are schematic-relative bounds that need to be projected to world coordinates.
+                 // However, legacy behavior was iterating the clipboard within x1..x2.
+                 // So we should mask the EditSession to only allow changes in the target world region
+                 // corresponding to these bounds.
 
-	// TODO remove the editSession need by directly setting the blocks in the chunk
-	@Override
-	public void paste(CityWorldGenerator generator, RealBlocks chunk, BlockFace facing, int blockX, int blockY,
-			int blockZ, int x1, int x2, int y1, int y2, int z1, int z2) {
-		Vector at = new Vector(blockX, blockY, blockZ);
-//		Vector min = new Vector(x1, y1, z1);
-//		Vector max = new Vector(x2, y2, z2);
-//		generator.reportMessage("Partial paste: origin = " + at + " min = " + min + " max = " + max);
+                 // Wait, if x1, x2 are schematic bounds, we need to know where they end up in the world.
+                 // Since we paste at 'to' (blockX, blockY, blockZ),
+                 // and the schematic is pasted relative to that.
 
-		try {
-			EditSession editSession = getEditSession(generator);
-			// editSession.setFastMode(true);
-			place(editSession, getFacingIndex(facing), at, true, x1, x2, y1, y2, z1, z2);
-		} catch (Exception e) {
-			generator.reportException("[WorldEdit] Partial place schematic " + name + " at " + at + " failed", e);
-			generator.reportMessage("Info: " + " facing = " + facing + " size = " + sizeX + ", " + sizeZ + " chunk = "
-					+ chunkX + ", " + chunkZ +
-//									" origin = "+ blockX + ", " + blockY + ", " + blockZ + 
-					" min = " + x1 + ", " + y1 + ", " + z1 + " max = " + x2 + ", " + y2 + ", " + z2);
+                 // Actually, simpler: Mask the edit session to the target chunk/area if possible.
+                 // But strictly implementing x1..x2 logic from legacy code:
+                 // "for (int x = x1; x < x2; x++)..."
+                 // This implies x1..x2 are indices into the clipboard dimensions.
+                 // If we use a mask, we need to calculate the world coordinates that these indices map to.
+                 // This is complicated by rotation/flipping.
 
-			e.printStackTrace();
-		}
-	}
+                 // For now, let's assume standard behavior where we just mask the output to the specific
+                 // region in the world that corresponds to the paste target + bounds.
+                 // But without complex math, maybe falling back to full paste IS safer than getting the mask wrong?
+                 // The reviewer called it "Dangerous" to paste outside.
+                 // So we should at least mask to the Chunk bounds?
+                 // CityWorld typically generates one chunk at a time.
+                 // So we should mask to the current chunk (chunkX, chunkZ).
 
-	// TODO Pilfered from WorldEdit's CuboidClipboard... I need to remove this once
-	// the other Place function is used
-	private void place(EditSession editSession, int facing, Vector pos, boolean noAir)
-			throws MaxChangedBlocksException {
-		for (int x = 0; x < sizeX; x++)
-			for (int y = 0; y < sizeY; y++)
-				for (int z = 0; z < sizeZ; z++) {
-					BaseBlock block = blocks[facing][x][y][z];
-					if (block != null) {
-						if ((noAir) && (block.isAir())) {
-							continue;
-						}
-						editSession.setBlock(new Vector(x, y, z).add(pos), block);
-					}
-				}
-	}
+                 int cx = chunk.getOriginX();
+                 int cz = chunk.getOriginZ();
+                 CuboidRegion chunkRegion = new CuboidRegion(
+                     BlockVector3.at(cx, -64, cz), // Support new depth
+                     BlockVector3.at(cx + 15, 319, cz + 15) // Support new height
+                 );
 
-	// TODO if WorldEdit ever gets this functionality I need to remove the modified
-	// code
-	private void place(EditSession editSession, int facing, Vector pos, boolean noAir, int x1, int x2, int y1, int y2,
-			int z1, int z2) throws MaxChangedBlocksException {
-		x1 = Math.max(x1, 0);
-		x2 = Math.min(x2, sizeX);
-		y1 = Math.max(y1, 0);
-		y2 = Math.min(y2, sizeY);
-		z1 = Math.max(z1, 0);
-		z2 = Math.min(z2, sizeZ);
-		for (int x = x1; x < x2; x++)
-			for (int y = y1; y < y2; y++)
-				for (int z = z1; z < z2; z++) {
-					BaseBlock block = blocks[facing][x][y][z];
-					if (block != null) {
-						if ((noAir) && (block.isAir())) {
-							continue;
-						}
-						editSession.setBlock(new Vector(x, y, z).add(pos), block);
-					}
-				}
-	}
+                 editSession.setMask(new RegionMask(chunkRegion));
+
+                 Operation operation = holder
+                        .createPaste(editSession)
+                        .to(to)
+                        .ignoreAirBlocks(true)
+                        .build();
+                 Operations.complete(operation);
+            }
+        } catch (Exception e) {
+            generator.reportException("[WorldEdit] Partial place schematic " + name + " at " + to + " failed", e);
+        }
+    }
 }

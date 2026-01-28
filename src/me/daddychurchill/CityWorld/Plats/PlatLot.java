@@ -54,7 +54,7 @@ public abstract class PlatLot {
 				Material.STONE_SLAB);
 		// dirt is 3, read in RoadLot
 		dirtroadSidewalk = platmap.generator.materialProvider.itemsMaterialListFor_Roads.getNthMaterial(4,
-				Material.GRASS_PATH);
+				Material.DIRT_PATH);
 
 		initializeDice(platmap, chunkX, chunkZ);
 

@@ -298,13 +298,13 @@ public class ShapeProvider_Normal extends ShapeProvider {
 						} else if (y < generator.evergreenLevel) {
 							generateStratas(generator, lot, chunk, x, z, ores.substratumMaterial, ores.stratumMaterial,
 									y - 2, ores.subsurfaceMaterial, y, ores.surfaceMaterial, surfaceCaves);
-							biome = Biome.BIRCH_FOREST_HILLS;
+							biome = Biome.BIRCH_FOREST;
 
 							// evergreen and some of fallen snow
 						} else if (y < generator.snowLevel) {
 							generateStratas(generator, lot, chunk, x, z, ores.substratumMaterial, ores.stratumMaterial,
 									y - 1, ores.subsurfaceMaterial, y, ores.surfaceMaterial, surfaceCaves);
-							biome = Biome.TAIGA_HILLS;
+							biome = Biome.TAIGA;
 
 							// only snow up here!
 						} else {
@@ -316,7 +316,7 @@ public class ShapeProvider_Normal extends ShapeProvider {
 								generateStratas(generator, lot, chunk, x, z, ores.substratumMaterial,
 										ores.stratumMaterial, y - 1, ores.stratumMaterial, y, ores.stratumMaterial,
 										surfaceCaves);
-							biome = Biome.SNOWY_MOUNTAINS;
+							biome = Biome.SNOWY_SLOPES;
 						}
 					}
 				}

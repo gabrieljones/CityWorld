@@ -1,0 +1,119 @@
+name: Record CityWorld Generation
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  workflow_dispatch:
+
+jobs:
+  record-server:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Build with Gradle
+      run: ./gradlew build
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg xvfb mesa-utils python3-pip
+        pip3 install portablemc
+
+    - name: Setup Minecraft Server
+      run: |
+        mkdir server
+        cd server
+
+        # Download Paper 1.21.1
+        # Fetch latest build info
+        BUILD_ID=$(curl -s https://api.papermc.io/v2/projects/paper/versions/1.21.1/builds | jq -r '.builds[-1].build')
+        JAR_NAME="paper-1.21.1-$BUILD_ID.jar"
+        DOWNLOAD_URL="https://api.papermc.io/v2/projects/paper/versions/1.21.1/builds/$BUILD_ID/downloads/$JAR_NAME"
+
+        echo "Downloading Paper build $BUILD_ID from $DOWNLOAD_URL"
+        curl -o server.jar "$DOWNLOAD_URL"
+
+        # Accept EULA
+        echo "eula=true" > eula.txt
+
+        # Configure Generator
+        echo "settings:" > bukkit.yml
+        echo "  allow-end: true" >> bukkit.yml
+        echo "  allow-nether: true" >> bukkit.yml
+        echo "worlds:" >> bukkit.yml
+        echo "  world:" >> bukkit.yml
+        echo "    generator: CityWorld" >> bukkit.yml
+
+        # Prepare Plugins folder
+        mkdir plugins
+        cp ../build/libs/CityWorld-4.100.jar plugins/CityWorld.jar
+
+        # Download WorldEdit (compatible with 1.21.1)
+        # Using a direct download link for 7.3.0 from Bukkit/CurseForge or EngineHub is hard to automate reliably without API.
+        # We will try to download from a known source or skip if not critical for simple generation tests.
+        # But per review, we should try.
+        # EngineHub builds are reliable. 7.3.6 is a recent version for 1.21.
+
+        WE_URL="https://dev.bukkit.org/projects/worldedit/files/latest"
+        echo "Downloading WorldEdit from $WE_URL"
+        curl -L -o plugins/WorldEdit.jar "$WE_URL"
+
+        # Configure server properties to allow offline players
+        echo "online-mode=false" > server.properties
+
+    - name: Run Server, Client and Record
+      run: |
+        # Start Xvfb
+        Xvfb :99 -screen 0 1280x720x24 &
+        export DISPLAY=:99
+
+        # Start recording
+        ffmpeg -f x11grab -video_size 1280x720 -i :99 -codec:v libx264 -r 30 -t 120 cityworld_generation.mp4 &
+        PID_FFMPEG=$!
+
+        # Start Server in background
+        cd server
+        java -Xms2G -Xmx2G -jar server.jar --nogui &
+        PID_SERVER=$!
+        cd ..
+
+        # Wait for server to start (grep logs or simple sleep)
+        echo "Waiting for server to start..."
+        sleep 45
+
+        # Launch Client using portablemc
+        # connecting to localhost
+        echo "Launching Minecraft Client..."
+        portablemc start 1.21.1 \
+            --server localhost \
+            --username CityExplorer \
+            --work-dir mc_client_dir &
+        PID_CLIENT=$!
+
+        # Let the client run for a bit to load the world
+        sleep 60
+
+        # Cleanup
+        kill $PID_CLIENT || true
+        kill $PID_SERVER || true
+
+        # Wait for ffmpeg to finish (it has -t 120)
+        wait $PID_FFMPEG || true
+
+    - name: Upload Recording
+      uses: actions/upload-artifact@v4
+      with:
+        name: cityworld-recording
+        path: cityworld_generation.mp4
