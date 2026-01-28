@@ -28,7 +28,8 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y ffmpeg xvfb mesa-utils
+        sudo apt-get install -y ffmpeg xvfb mesa-utils python3-pip
+        pip3 install portablemc
 
     - name: Setup Minecraft Server
       run: |
@@ -59,23 +60,47 @@ jobs:
         mkdir plugins
         cp ../build/libs/CityWorld-4.060.jar plugins/CityWorld.jar
 
-    - name: Run Server and Record
+        # Configure server properties to allow offline players
+        echo "online-mode=false" > server.properties
+
+    - name: Run Server, Client and Record
       run: |
+        # Start Xvfb
+        Xvfb :99 -screen 0 1280x720x24 &
+        export DISPLAY=:99
+
+        # Start recording
+        ffmpeg -f x11grab -video_size 1280x720 -i :99 -codec:v libx264 -r 30 -t 120 cityworld_generation.mp4 &
+        PID_FFMPEG=$!
+
+        # Start Server in background
         cd server
+        java -Xms2G -Xmx2G -jar server.jar --nogui &
+        PID_SERVER=$!
+        cd ..
 
-        # Start Xvfb, ffmpeg, and Minecraft Server
-        # We record for 60 seconds which should be enough to start and generate spawn
+        # Wait for server to start (grep logs or simple sleep)
+        echo "Waiting for server to start..."
+        sleep 45
 
-        xvfb-run --server-args="-screen 0 1280x720x24" sh -c '
-          ffmpeg -f x11grab -video_size 1280x720 -i :99 -codec:v libx264 -r 30 -t 60 ../cityworld_generation.mp4 &
-          PID_FFMPEG=$!
+        # Launch Client using portablemc
+        # connecting to localhost
+        echo "Launching Minecraft Client..."
+        portablemc start 1.21.1 \
+            --server localhost \
+            --username CityExplorer \
+            --work-dir mc_client_dir &
+        PID_CLIENT=$!
 
-          # Run Server (GUI enabled by default without --nogui)
-          # Use timeout to kill server after 60s
-          timeout 60s java -Xms2G -Xmx2G -jar server.jar
+        # Let the client run for a bit to load the world
+        sleep 60
 
-          wait $PID_FFMPEG
-        ' || true
+        # Cleanup
+        kill $PID_CLIENT || true
+        kill $PID_SERVER || true
+
+        # Wait for ffmpeg to finish (it has -t 120)
+        wait $PID_FFMPEG || true
 
     - name: Upload Recording
       uses: actions/upload-artifact@v4
