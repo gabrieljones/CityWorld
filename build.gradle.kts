@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "me.daddychurchill"
-version = "4.060"
+version = "4.100"
 
 repositories {
     mavenCentral()
@@ -19,6 +19,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.mockito:mockito-core:5.10.0")
     testImplementation("org.mockito:mockito-junit-jupiter:5.10.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 java {

@@ -58,7 +58,17 @@ jobs:
 
         # Prepare Plugins folder
         mkdir plugins
-        cp ../build/libs/CityWorld-4.060.jar plugins/CityWorld.jar
+        cp ../build/libs/CityWorld-4.100.jar plugins/CityWorld.jar
+
+        # Download WorldEdit (compatible with 1.21.1)
+        # Using a direct download link for 7.3.0 from Bukkit/CurseForge or EngineHub is hard to automate reliably without API.
+        # We will try to download from a known source or skip if not critical for simple generation tests.
+        # But per review, we should try.
+        # EngineHub builds are reliable. 7.3.6 is a recent version for 1.21.
+
+        WE_URL="https://dev.bukkit.org/projects/worldedit/files/latest"
+        echo "Downloading WorldEdit from $WE_URL"
+        curl -L -o plugins/WorldEdit.jar "$WE_URL"
 
         # Configure server properties to allow offline players
         echo "online-mode=false" > server.properties
